@@ -19,12 +19,12 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 # Your Twilio phone number
 TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"  # Example number
 
-# Product database
-PRODUCTS = {
-    "aliengo kingsize black": 150,
-    "korobo 1 1/4\" blue": 100,
-    "wetop 1 1/4\" brown": 100,
-    "box with 50 booklets": 2300,
+# Product database and a new dictionary for numbered options
+PRODUCT_OPTIONS = {
+    1: {"name": "aliengo kingsize black", "price": 150},
+    2: {"name": "korobo 1 1/4\" blue", "price": 100},
+    3: {"name": "wetop 1 1/4\" brown", "price": 100},
+    4: {"name": "box with 50 booklets", "price": 2300},
 }
 DELIVERY_CHARGE = 200
 POCHI_DETAILS = "Pochi la Biashara 0743706598"
@@ -91,31 +91,28 @@ def webhook():
     # --- State-based Conversation Flow ---
     if user_session["state"] == "initial":
         # First-time user message
-        message = (
-            "Hey there! 🌿 Welcome to our rolling paper shop!\n\n"
-            "Here's what we have:\n"
-            "* Aliengo Kingsize Black: Ksh 150\n"
-            "* Korobo 1 1/4\" Blue: Ksh 100\n"
-            "* WeTop 1 1/4\" Brown: Ksh 100\n"
-            "* Box with 50 booklets: Ksh 2300\n\n"
-            "Just reply with the name of the product you'd like to order."
-        )
+        message = "Hey there! 🌿 Welcome to our rolling paper shop!\n\nHere's what we have:\n"
+        for num, product_info in PRODUCT_OPTIONS.items():
+            message += f"{num}. {product_info['name'].title()}: Ksh {product_info['price']}\n"
+        message += "\nJust reply with the number of the product you'd like to order."
         response.message(message)
         user_session["state"] = "awaiting_product"
 
     elif user_session["state"] == "awaiting_product":
-        selected_product = None
-        for product_name in PRODUCTS:
-            if product_name in incoming_msg:
-                selected_product = product_name
-                break
-
-        if selected_product:
-            user_session["product"] = selected_product
+        selected_option = None
+        try:
+            # Try to convert the user's input to an integer and check if it's a valid option
+            selected_option = int(incoming_msg)
+            if selected_option not in PRODUCT_OPTIONS:
+                raise ValueError
+            
+            selected_product_info = PRODUCT_OPTIONS[selected_option]
+            user_session["product"] = selected_product_info["name"]
+            user_session["price"] = selected_product_info["price"]
             user_session["state"] = "awaiting_quantity"
-            response.message(f"Got it! How many booklets of *{selected_product.title()}* would you like?")
-        else:
-            response.message("Oops, I didn't get that. Please choose from the list above.\n\nType 'help' if you want to talk to an agent.")
+            response.message(f"Got it! How many booklets of *{user_session['product'].title()}* would you like?")
+        except (ValueError, IndexError):
+            response.message("Oops, that's not a valid option. Please choose a number from the list.\n\nType 'help' if you want to talk to an agent.")
 
     elif user_session["state"] == "awaiting_quantity":
         try:
@@ -130,7 +127,7 @@ def webhook():
 
     elif user_session["state"] == "awaiting_location":
         user_session["location"] = incoming_msg
-        product_price = PRODUCTS[user_session["product"]]
+        product_price = user_session["price"]
         quantity = user_session["quantity"]
         subtotal = product_price * quantity
         total = subtotal + DELIVERY_CHARGE
