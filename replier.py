@@ -90,16 +90,15 @@ def webhook():
 
     if incoming_msg == "start":
         sessions.pop(from_number, None)
-        response.message("Okay, let's start over! 🚀")
-        return str(response)
+        # Fall through to the 'initial' state to start the conversation over.
 
     # --- State-based Conversation Flow ---
-    if user_session["state"] == "initial":
-        # First-time user message
+    if user_session["state"] == "initial" or incoming_msg == "start":
+        # First-time user message or user restarts the order
         message = "Hey there! 🌿 Welcome to our rolling paper shop!\n\nHere's what we have:\n"
         for num, product_info in PRODUCT_OPTIONS.items():
             message += f"{num}. {product_info['name'].title()}: Ksh {product_info['price']}\n"
-        message += "\nJust reply with the number of the product you'd like to order."
+        message += "\nJust reply with the number of the product you'd like to order.\n\nType 'help' for an agent or 'start' to begin a new order."
         response.message(message)
         user_session["state"] = "awaiting_product"
 
@@ -115,9 +114,9 @@ def webhook():
             user_session["product"] = selected_product_info["name"]
             user_session["price"] = selected_product_info["price"]
             user_session["state"] = "awaiting_quantity"
-            response.message(f"Got it! How many booklets of *{user_session['product'].title()}* would you like?")
+            response.message(f"Got it! How many booklets of *{user_session['product'].title()}* would you like?\n\nReply with 'start' to begin a new order.")
         except (ValueError, IndexError):
-            response.message("Oops, that's not a valid option. Please choose a number from the list.\n\nType 'help' if you want to talk to an agent.")
+            response.message("Oops, that's not a valid option. Please choose a number from the list.\n\nType 'help' if you want to talk to an agent or 'start' to begin a new order.")
 
     elif user_session["state"] == "awaiting_quantity":
         try:
@@ -126,11 +125,12 @@ def webhook():
                 raise ValueError
             user_session["quantity"] = quantity
             user_session["state"] = "awaiting_location"
-            response.message("Thanks! What's your delivery location? I'll calculate your total with the delivery fee.")
+            response.message("Thanks! What's your delivery location? I'll calculate your total with the delivery fee.\n\nReply with 'start' to begin a new order.")
         except ValueError:
-            response.message("Please enter a valid number for the quantity.")
+            response.message("Please enter a valid number for the quantity.\n\nReply with 'start' to begin a new order.")
 
     elif user_session["state"] == "awaiting_location":
+        # The bot is in the awaiting_location state, so any input is treated as a string location.
         user_session["location"] = incoming_msg
         product_price = user_session["price"]
         quantity = user_session["quantity"]
