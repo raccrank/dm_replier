@@ -66,7 +66,7 @@ def notify_client_of_handoff(customer_number, customer_message):
 
 # --- Flask Endpoints ---
 
-@app.route("/webhook", methods=["POST"])
+@app.route("/whatsapp", methods=["POST"])
 def webhook():
     """
     The main webhook endpoint that listens for incoming WhatsApp messages
