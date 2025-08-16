@@ -79,13 +79,18 @@ def webhook():
     # Get the user's session or create a new one
     user_session = sessions.get(from_number, {"state": "initial"})
 
-    # Check for live agent keywords first, this is a top priority
+    # Check for keywords that can be used at any time
     live_agent_keywords = ["help", "agent", "human", "talk to a person", "live agent"]
     if any(keyword in incoming_msg for keyword in live_agent_keywords):
         notify_client_of_handoff(from_number, incoming_msg)
         user_session["state"] = "handoff"
         sessions[from_number] = user_session
         response.message("Connecting you with a live agent now. They'll be with you shortly!")
+        return str(response)
+
+    if incoming_msg == "start":
+        sessions.pop(from_number, None)
+        response.message("Okay, let's start over! 🚀")
         return str(response)
 
     # --- State-based Conversation Flow ---
@@ -141,13 +146,13 @@ def webhook():
             f"Delivery to {user_session['location']}: Ksh {DELIVERY_CHARGE}\n"
             "------------------------\n"
             f"💰 *Total: Ksh {total}*\n\n"
-            "Please reply with *'confirm'* to proceed with payment."
+            "Reply with *'1'* to confirm your order and get payment details, or *'start'* to begin a new order."
         )
         response.message(summary)
         user_session["state"] = "awaiting_confirmation"
 
     elif user_session["state"] == "awaiting_confirmation":
-        if "confirm" in incoming_msg:
+        if incoming_msg == "1":
             message = (
                 f"Awesome! Please pay Ksh {user_session['total_price']} to our Pochi la Biashara:\n"
                 f"*{POCHI_DETAILS}*\n\n"
@@ -159,9 +164,10 @@ def webhook():
             user_session["state"] = "initial"
             sessions.pop(from_number, None) # Remove the session to clean up memory
         else:
-            response.message("Okay, your order has not been confirmed. You can start a new order at any time.")
-            user_session["state"] = "initial"
-
+            response.message("Oops, that's not a valid option. Please reply with '1' to confirm, or 'start' to begin a new order.")
+            # Keep the user in the same state in case they make another mistake
+            user_session["state"] = "awaiting_confirmation"
+    
     elif user_session["state"] == "handoff":
         # Do nothing, a human agent is now handling this conversation
         # You could send a passive "A human is still with you" message if needed
